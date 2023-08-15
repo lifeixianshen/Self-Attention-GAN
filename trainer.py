@@ -79,11 +79,7 @@ class Trainer(object):
         fixed_z = tensor2var(torch.randn(self.batch_size, self.z_dim))
 
         # Start with trained model
-        if self.pretrained_model:
-            start = self.pretrained_model + 1
-        else:
-            start = 0
-
+        start = self.pretrained_model + 1 if self.pretrained_model else 0
         # Start time
         start_time = time.time()
         for step in range(start, self.total_step):
@@ -156,11 +152,8 @@ class Trainer(object):
 
             # Compute loss with fake images
             g_out_fake,_,_ = self.D(fake_images)  # batch x n
-            if self.adv_loss == 'wgan-gp':
+            if self.adv_loss in ['wgan-gp', 'hinge']:
                 g_loss_fake = - g_out_fake.mean()
-            elif self.adv_loss == 'hinge':
-                g_loss_fake = - g_out_fake.mean()
-
             self.reset_grad()
             g_loss_fake.backward()
             self.g_optimizer.step()
@@ -179,14 +172,20 @@ class Trainer(object):
             # Sample images
             if (step + 1) % self.sample_step == 0:
                 fake_images,_,_= self.G(fixed_z)
-                save_image(denorm(fake_images.data),
-                           os.path.join(self.sample_path, '{}_fake.png'.format(step + 1)))
+                save_image(
+                    denorm(fake_images.data),
+                    os.path.join(self.sample_path, f'{step + 1}_fake.png'),
+                )
 
             if (step+1) % model_save_step==0:
-                torch.save(self.G.state_dict(),
-                           os.path.join(self.model_save_path, '{}_G.pth'.format(step + 1)))
-                torch.save(self.D.state_dict(),
-                           os.path.join(self.model_save_path, '{}_D.pth'.format(step + 1)))
+                torch.save(
+                    self.G.state_dict(),
+                    os.path.join(self.model_save_path, f'{step + 1}_G.pth'),
+                )
+                torch.save(
+                    self.D.state_dict(),
+                    os.path.join(self.model_save_path, f'{step + 1}_D.pth'),
+                )
 
     def build_model(self):
 
@@ -211,11 +210,21 @@ class Trainer(object):
         self.logger = Logger(self.log_path)
 
     def load_pretrained_model(self):
-        self.G.load_state_dict(torch.load(os.path.join(
-            self.model_save_path, '{}_G.pth'.format(self.pretrained_model))))
-        self.D.load_state_dict(torch.load(os.path.join(
-            self.model_save_path, '{}_D.pth'.format(self.pretrained_model))))
-        print('loaded trained models (step: {})..!'.format(self.pretrained_model))
+        self.G.load_state_dict(
+            torch.load(
+                os.path.join(
+                    self.model_save_path, f'{self.pretrained_model}_G.pth'
+                )
+            )
+        )
+        self.D.load_state_dict(
+            torch.load(
+                os.path.join(
+                    self.model_save_path, f'{self.pretrained_model}_D.pth'
+                )
+            )
+        )
+        print(f'loaded trained models (step: {self.pretrained_model})..!')
 
     def reset_grad(self):
         self.d_optimizer.zero_grad()
